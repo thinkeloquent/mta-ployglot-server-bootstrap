@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { Addon } from "../registry/registry.js";
 import { createLoaderReport, reportError, sortByNumericPrefix } from "../contract/index.js";
 
-const ROUTE_SUFFIXES = [".routes.mjs", ".routes.js", ".route.mjs", ".route.js"];
+const ROUTE_SUFFIXES = [".routes.mjs", ".routes.js"];
 
 async function discoverRouteFiles(dir: string): Promise<string[]> {
   try {

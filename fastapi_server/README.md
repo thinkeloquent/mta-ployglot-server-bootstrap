@@ -1,6 +1,6 @@
 # fastapi-server
 
-Runtime-neutral polyglot bootstrap orchestrator for FastAPI. Discover `*_env.py`, `*_lifecycle.py`, and `*_routes.py` files at boot; register them via a pluggable addon pipeline; ship your service without writing bootstrap code.
+Runtime-neutral polyglot bootstrap orchestrator for FastAPI. Discover `*.env.py`, `*.lifecycle.py`, and `*.routes.py` files at boot; register them via a pluggable addon pipeline; ship your service without writing bootstrap code.
 
 ## Install
 

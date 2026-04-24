@@ -13,7 +13,7 @@ triggers:
 
 ## What the loader expects
 
-`routeAddon` (priority 30) scans `config.paths.routes/` for files ending in `.routes.mjs`, `.routes.js`, `.route.mjs`, `.route.js`. It dynamic-`import()`s each, then takes:
+`routeAddon` (priority 30) scans `config.paths.routes/` for files ending in `.routes.mjs` or `.routes.js`. It dynamic-`import()`s each, then takes:
 
 1. `module.default`
 2. `module.mount`

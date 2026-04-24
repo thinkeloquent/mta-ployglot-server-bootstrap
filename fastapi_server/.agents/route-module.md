@@ -1,7 +1,7 @@
 ---
 name: route-module
 scope: fastapi_server
-description: Write a *_routes.py module that the built-in route_addon will discover and mount on the FastAPI app.
+description: Write a *.routes.py module that the built-in route_addon will discover and mount on the FastAPI app.
 triggers:
   - "routes file"
   - "mount router"
@@ -13,7 +13,7 @@ triggers:
 
 ## What the loader expects
 
-`route_addon` (priority 30) scans `config.paths.routes/` for files ending in `_routes.py`, `.routes.py`, `_route.py`, or `.route.py`. It then looks at the module — in order — for:
+`route_addon` (priority 30) scans `config.paths.routes/` for files ending in `.routes.py`. It then looks at the module — in order — for:
 
 1. `mount`
 2. `router`
@@ -29,7 +29,7 @@ If none of the three are present, the module is `skipped` and an entry is added 
 ## Template (recommended)
 
 ```python
-# config/routes/10_healthz_routes.py
+# config/routes/10_healthz.routes.py
 from __future__ import annotations
 import os
 from fastapi import APIRouter
@@ -53,7 +53,7 @@ def mount(app, config) -> APIRouter:
 ## Alternative: expose a pre-built router
 
 ```python
-# config/routes/20_metrics_routes.py
+# config/routes/20_metrics.routes.py
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/metrics")
@@ -80,7 +80,7 @@ This works but you lose access to `config` — prefer `mount(app, config)` unles
 ```python
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
-from my_project.config.routes._10_healthz_routes import mount  # or importlib
+from my_project.config.routes._10_healthz_routes import mount  # module: 10_healthz.routes.py → 10_healthz_routes when imported
 
 
 def test_healthz():

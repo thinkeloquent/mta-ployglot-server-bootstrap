@@ -15,7 +15,7 @@ triggers:
 
 ## What the loader expects
 
-`lifecycle_addon` scans `config.paths.lifecycles/` for files ending in `_lifecycle.py` or `.lifecycle.py` and looks for these three names at module top-level:
+`lifecycle_addon` scans `config.paths.lifecycles/` for files ending in `.lifecycle.py` and looks for these three names at module top-level:
 
 | Export | Runs when | Errors | Typical use |
 | --- | --- | --- | --- |

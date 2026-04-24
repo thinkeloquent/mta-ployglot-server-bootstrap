@@ -4,7 +4,7 @@ from fastapi_server.bootstrap.contract import create_loader_report, report_error
 from fastapi_server.bootstrap.registry.registry import Addon
 from fastapi_server.bootstrap.addons._discover import find_matching_files, import_file
 
-_SUFFIXES = ("_lifecycle.py", ".lifecycle.py")
+_SUFFIXES = (".lifecycle.py",)
 _HOOK_KEYS = ("on_init", "on_startup", "on_shutdown")
 
 

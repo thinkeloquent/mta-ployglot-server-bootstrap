@@ -1,7 +1,7 @@
 {
-  "repo": "mta-server-bootstrap",
+  "repo": "mta-ployglot-server-bootstrap",
   "root": ".",
-  "generatedAt": "2026-04-23T16:20:48.450Z",
+  "generatedAt": "2026-04-24T04:47:04.816Z",
   "generator": ".agent/scan.mjs",
   "totalSkills": 13,
   "packages": [
@@ -78,7 +78,7 @@
           "file": "fastapi_server/.agents/route-module.md",
           "name": "route-module",
           "scope": "fastapi_server",
-          "description": "Write a *_routes.py module that the built-in route_addon will discover and mount on the FastAPI app.",
+          "description": "Write a *.routes.py module that the built-in route_addon will discover and mount on the FastAPI app.",
           "triggers": [
             "routes file",
             "mount router",
