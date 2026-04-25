@@ -1,53 +1,39 @@
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Addon } from "../registry/registry.js";
-import { createLoaderReport, reportError, sortByNumericPrefix } from "../contract/index.js";
+import { createLoaderReport } from "../contract/index.js";
+import { createLoaderLogger } from "../registry/loader_logger.js";
+import { discoverFiles } from "./_discover.js";
 
-const ROUTE_SUFFIXES = [".routes.mjs", ".routes.js"];
-
-async function discoverRouteFiles(dir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    const matches: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (ROUTE_SUFFIXES.some((s) => entry.name.endsWith(s))) {
-        matches.push(join(dir, entry.name));
-      }
-    }
-    return sortByNumericPrefix(matches);
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return [];
-    throw err;
-  }
-}
+const ROUTE_SUFFIXES = [".routes.mjs", ".routes.js"] as const;
 
 export const routeAddon: Addon = {
   name: "route",
   priority: 30,
   async run(server, config, ctx) {
     const report = createLoaderReport("route");
+    const log = createLoaderLogger("route", ctx.logger, report);
     const adapter = ctx.getAdapter();
 
     for (const dir of config.paths.routes) {
-      let files: string[] = [];
+      let result;
       try {
-        files = await discoverRouteFiles(dir);
+        result = await discoverFiles(dir, ROUTE_SUFFIXES);
       } catch (err) {
-        reportError(report, "discover", err, dir);
+        log.failed("discover", dir, err);
         continue;
       }
-      report.discovered += files.length;
+      log.scanDir(dir, result.matched.length, result.ignored.length);
+      for (const p of result.ignored) log.ignored(p);
+      report.discovered += result.matched.length;
 
-      for (const file of files) {
+      for (const file of result.matched) {
         let mod: { default?: unknown; mount?: unknown };
         try {
           mod = (await import(pathToFileURL(file).href)) as { default?: unknown; mount?: unknown };
           report.imported += 1;
+          log.loaded(file);
         } catch (err) {
-          reportError(report, "import", err, file);
+          log.failed("import", file, err);
           continue;
         }
         const fn = (mod.default ?? mod.mount) as
@@ -55,14 +41,15 @@ export const routeAddon: Addon = {
           | undefined;
         if (typeof fn !== "function") {
           report.skipped += 1;
-          reportError(report, "shape", `module has no default or mount function`, file);
+          log.failed("shape", file, "module has no default or mount function");
           continue;
         }
         try {
           await adapter.registerRoutes(server, fn as never);
           report.registered += 1;
+          log.registered(file);
         } catch (err) {
-          reportError(report, "register", err, file);
+          log.failed("register", file, err);
         }
       }
     }

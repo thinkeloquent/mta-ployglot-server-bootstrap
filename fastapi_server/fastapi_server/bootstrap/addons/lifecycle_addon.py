@@ -1,57 +1,64 @@
 from __future__ import annotations
 
-from fastapi_server.bootstrap.contract import create_loader_report, report_error
+from fastapi_server.bootstrap.contract import create_loader_report
 from fastapi_server.bootstrap.registry.registry import Addon
-from fastapi_server.bootstrap.addons._discover import find_matching_files, import_file
+from fastapi_server.bootstrap.registry.loader_logger import create_loader_logger
+from fastapi_server.bootstrap.addons._discover import discover_files, import_file
 
 _SUFFIXES = (".lifecycle.py",)
-_HOOK_KEYS = ("on_init", "on_startup", "on_shutdown")
 
 
 def _run(_server, config, ctx):
     report = create_loader_report("lifecycle")
+    log = create_loader_logger("lifecycle", ctx.logger, report)
     init_count = 0
     start_count = 0
     stop_count = 0
 
     for d in config.paths.lifecycles:
         try:
-            files = find_matching_files(d, _SUFFIXES)
+            result = discover_files(d, _SUFFIXES)
         except Exception as err:  # noqa: BLE001
-            report_error(report, "discover", err, d)
+            log.failed("discover", d, err)
             continue
-        report.discovered += len(files)
+        log.scan_dir(d, len(result.matched), len(result.ignored))
+        for p in result.ignored:
+            log.ignored(p)
+        report.discovered += len(result.matched)
 
-        for file in files:
+        for file in result.matched:
             try:
                 mod = import_file(file, module_name_prefix="polyglot_lifecycle")
                 report.imported += 1
+                log.loaded(file)
             except Exception as err:  # noqa: BLE001
-                report_error(report, "import", err, file)
+                log.failed("import", file, err)
                 continue
 
-            registered_any = False
             on_init = getattr(mod, "on_init", None)
             on_startup = getattr(mod, "on_startup", None)
             on_shutdown = getattr(mod, "on_shutdown", None)
 
+            hooks = []
             if callable(on_init):
                 ctx.register_init_hook(on_init)
                 init_count += 1
-                registered_any = True
+                hooks.append("init")
             if callable(on_startup):
                 ctx.register_startup_hook(on_startup)
                 start_count += 1
-                registered_any = True
+                hooks.append("startup")
             if callable(on_shutdown):
                 ctx.register_shutdown_hook(on_shutdown)
                 stop_count += 1
-                registered_any = True
+                hooks.append("shutdown")
 
-            if registered_any:
+            if hooks:
                 report.registered += 1
+                log.registered(file, "+".join(hooks))
             else:
                 report.skipped += 1
+                log.skipped(file, "no on_init/on_startup/on_shutdown export")
 
     report.details = {
         "init_hooks": init_count,

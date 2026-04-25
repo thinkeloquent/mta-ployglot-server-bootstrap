@@ -2,23 +2,38 @@ from __future__ import annotations
 
 import importlib.util
 import os
+from dataclasses import dataclass, field
 from types import ModuleType
 from typing import List, Tuple
 
 from fastapi_server.bootstrap.contract import sort_by_numeric_prefix
 
 
+@dataclass
+class DiscoverResult:
+    matched: List[str] = field(default_factory=list)
+    ignored: List[str] = field(default_factory=list)
+
+
 def find_matching_files(directory: str, suffixes: Tuple[str, ...]) -> List[str]:
+    return discover_files(directory, suffixes).matched
+
+
+def discover_files(directory: str, suffixes: Tuple[str, ...]) -> DiscoverResult:
     if not os.path.isdir(directory):
-        return []
-    matches: List[str] = []
+        return DiscoverResult()
+    matched: List[str] = []
+    ignored: List[str] = []
     for name in os.listdir(directory):
         full = os.path.join(directory, name)
         if not os.path.isfile(full):
+            ignored.append(full)
             continue
         if name.endswith(suffixes):
-            matches.append(full)
-    return sort_by_numeric_prefix(matches)
+            matched.append(full)
+        else:
+            ignored.append(full)
+    return DiscoverResult(matched=sort_by_numeric_prefix(matched), ignored=ignored)
 
 
 def import_file(path: str, module_name_prefix: str = "polyglot_dyn") -> ModuleType:

@@ -1,29 +1,11 @@
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Addon } from "../registry/registry.js";
 import type { HookFn } from "../contract/index.js";
-import { createLoaderReport, reportError, sortByNumericPrefix } from "../contract/index.js";
+import { createLoaderReport } from "../contract/index.js";
+import { createLoaderLogger } from "../registry/loader_logger.js";
+import { discoverFiles } from "./_discover.js";
 
-const LIFECYCLE_SUFFIXES = [".lifecycle.mjs", ".lifecycle.js"];
-
-async function discoverLifecycleFiles(dir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    const matches: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (LIFECYCLE_SUFFIXES.some((s) => entry.name.endsWith(s))) {
-        matches.push(join(dir, entry.name));
-      }
-    }
-    return sortByNumericPrefix(matches);
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return [];
-    throw err;
-  }
-}
+const LIFECYCLE_SUFFIXES = [".lifecycle.mjs", ".lifecycle.js"] as const;
 
 interface LifecycleModule {
   default?: unknown;
@@ -37,27 +19,31 @@ export const lifecycleAddon: Addon = {
   priority: 20,
   async run(_server, config, ctx) {
     const report = createLoaderReport("lifecycle");
+    const log = createLoaderLogger("lifecycle", ctx.logger, report);
     let initCount = 0;
     let startCount = 0;
     let stopCount = 0;
 
     for (const dir of config.paths.lifecycles) {
-      let files: string[] = [];
+      let result;
       try {
-        files = await discoverLifecycleFiles(dir);
+        result = await discoverFiles(dir, LIFECYCLE_SUFFIXES);
       } catch (err) {
-        reportError(report, "discover", err, dir);
+        log.failed("discover", dir, err);
         continue;
       }
-      report.discovered += files.length;
+      log.scanDir(dir, result.matched.length, result.ignored.length);
+      for (const p of result.ignored) log.ignored(p);
+      report.discovered += result.matched.length;
 
-      for (const file of files) {
+      for (const file of result.matched) {
         let mod: LifecycleModule;
         try {
           mod = (await import(pathToFileURL(file).href)) as LifecycleModule;
           report.imported += 1;
+          log.loaded(file);
         } catch (err) {
-          reportError(report, "import", err, file);
+          log.failed("import", file, err);
           continue;
         }
 
@@ -65,24 +51,29 @@ export const lifecycleAddon: Addon = {
           ? (mod.default as LifecycleModule)
           : mod;
 
-        let registeredAny = false;
+        const hooks: string[] = [];
         if (typeof source.onInit === "function") {
           ctx.registerInitHook(source.onInit);
           initCount += 1;
-          registeredAny = true;
+          hooks.push("init");
         }
         if (typeof source.onStartup === "function") {
           ctx.registerStartupHook(source.onStartup);
           startCount += 1;
-          registeredAny = true;
+          hooks.push("startup");
         }
         if (typeof source.onShutdown === "function") {
           ctx.registerShutdownHook(source.onShutdown);
           stopCount += 1;
-          registeredAny = true;
+          hooks.push("shutdown");
         }
-        if (registeredAny) report.registered += 1;
-        else report.skipped += 1;
+        if (hooks.length > 0) {
+          report.registered += 1;
+          log.registered(file, hooks.join("+"));
+        } else {
+          report.skipped += 1;
+          log.skipped(file, "no onInit/onStartup/onShutdown export");
+        }
       }
     }
 
